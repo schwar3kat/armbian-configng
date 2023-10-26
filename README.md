@@ -34,7 +34,7 @@ Run Jampi-Config: Now, when you run Jampi-Config, it will automatically find you
 
 # Understanding Folders and Categories: 
 
-In Jampi-Config, folders are used to organize scripts into categories. Each subfolder in the lib/config/ directory represents a category in the menu. When you select a category, it will open a submenu containing all the scripts in that category’s folder. So, make sure to place your script in an appropriate category folder.
+In Jampi-Config, folders are used to organize scripts into categories. Each subfolder in the lib/configng/ directory represents a category in the menu. When you select a category, it will open a submenu containing all the scripts in that category’s folder. So, make sure to place your script in an appropriate category folder.
 
 
 License
