@@ -1,0 +1,162 @@
+#!/bin/bash
+
+clear
+debug="0"
+directory="$(dirname "${BASH_SOURCE[0]}")"
+cd "$directory" || exit
+libpath="$directory/../lib"
+
+if [[ ! -d "$libpath" ]]; then
+    echo "Libraries not found"
+    exit 0
+fi
+
+for file in "$libpath"/configng/*/*.sh; do
+    source "$file"
+done
+
+mapfile -t categories < <(ls -d "$libpath/configng"/* )
+
+declare -A functions
+
+for category in "${categories[@]}"; do
+    category_name="${category##*/}"
+
+    category_file="$category/category"
+    if [[ -f "$category_file" ]]; then
+        category_description=$(grep -oP "(?<=# @description ).*" "$category_file")
+    fi
+
+    for file in "$category"/*.sh; do
+        description=""
+        while IFS= read -r line; do
+            if [[ $line =~ ^#\ @description\ (.*)$ ]]; then
+                description="${BASH_REMATCH[1]}"
+            elif [[ $line =~ ^function\ (.*)\(\)\{$ ]]; then
+                function_name="${BASH_REMATCH[1]}"
+                key="$category_name:${file##*/}:${function_name}"
+                functions["$key,function_name"]=$(echo "$function_name" | sed 's/.*:://')
+                functions["$key,group_name"]=$(echo "$function_name" | sed 's/::.*//')
+                functions["$key,description"]=$description
+            elif [[ $line =~ ^#\ @options\ (.*)$ ]]; then
+                functions["$key,options"]="${BASH_REMATCH[1]}"
+            fi
+        done < "$file"
+        functions["$key,category"]=$category_name
+        functions["$key,category_description"]=$category_description
+    done
+done
+
+see_debug() {
+echo
+    for category in "${categories[@]}"; do
+        echo "Category: ${category##*/}"
+		echo "Category Description: ${functions["$key,category_description"]}"
+
+        for file in "$category"/*.sh; do
+            echo "  File: ${file##*/}"
+
+            mapfile -t functions_in_file < <(grep -oP '(?<=function\s)\w+::\w+' "$file")
+
+            for function in "${functions_in_file[@]}"; do
+                key="${category##*/}:${file##*/}:${function}"
+                echo "        Full Function Name: ${function} - Description: ${functions["$key,description"]}"
+                echo "            Group Name: ${functions["$key,group_name"]}"
+                echo "            Action Name: ${functions["$key,function_name"]}"
+                echo "            Options: ${functions["$key,options"]}"
+            done
+        done
+		echo
+    done
+	echo 
+
+
+}
+
+see_list() {
+    echo
+    # Loop through each category
+    for category in "${categories[@]}"; do
+        # Initialize an empty array to store the group names that have been printed
+        declare -A printed_groups
+
+        # Loop through each file in the category
+        for file in "$category"/*.sh; do
+
+            # Extract functions from the file
+            mapfile -t functions_in_file < <(grep -oP '(?<=function\s)\w+::\w+' "$file")
+
+            # Loop through each function in the file
+            for function in "${functions_in_file[@]}"; do
+                key="${category##*/}:${file##*/}:${function}"
+                group_name=${functions["$key,group_name"]}
+
+                # If the group name has not been printed yet, print it and add it to the array
+                if [[ -z ${printed_groups["$group_name"]} ]]; then
+                    echo "    $group_name, [action]"
+                    printed_groups["$group_name"]=1
+                fi
+
+                echo "            ${functions["$key,function_name"]} - ${functions["$key,description"]}"
+            done
+        done
+		echo
+    done
+	echo
+}
+
+
+see_help(){
+
+    echo -e "Usage: ${filename%.*} [options] [action]"
+    echo -e "  Options:"
+    echo -e "    -h,    Print this help."
+    echo
+    echo -e "    -r,    Run a function group."
+
+}
+
+
+parse_action() {
+    local group=$1
+    local action=$2
+
+    # Construct the full function name
+    local function_name="${group}::${action}"
+
+    # Check if the function exists
+    if declare -f "$function_name" > /dev/null; then
+        # Return the function name
+        echo "$function_name"
+    else
+        echo "Error: Unknown action '$action' for group '$group'"
+        return 1
+    fi
+}
+
+
+if [ "$1" == "-r" ]; then
+    shift  # Shifts the arguments to the left, excluding the first argument ("-r")
+    group_name="$1"  # Takes the first argument as the group name
+    shift 1  # Shifts the arguments again to exclude the group name
+
+    function_name=$(parse_action "$group_name" "$1")
+    if [ $? -eq 0 ]; then
+        # Call the function using variable indirection
+        ${function_name}
+    fi
+
+elif [ "$1" == "-h" ]; then
+    see_help
+    see_list
+elif [ "$1" == "-d" ] || [ $debug == "1" ] ; then
+        dialog --title "Config Options" --msgbox "$( see_help; see_list )" 0 0
+    dialog --title "Config Options" --msgbox "$( see_debug )" 0 0
+	clear
+	see_debug
+	exit
+else
+
+	exit
+fi
+
