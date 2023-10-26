@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Sudo Users Home
+USER_HOME=$(eval echo ~$SUDO_USER)
+
 clear
 debug="0"
 directory="$(dirname "${BASH_SOURCE[0]}")"
@@ -149,13 +152,12 @@ elif [ "$1" == "-h" ]; then
     see_help
     see_list
 elif [ "$1" == "-d" ] || [ $debug == "1" ] ; then
-        dialog --title "Config Options" --msgbox "$( see_help; see_list )" 0 0
-        dialog --title "Config Options" --msgbox "$( see_debug )" 0 0
-	clear
-	see_debug
+        dialog --title "Config Options" --msgbox "$( see_help; see_list )" 0 0 ; clear ;
+		see_debug
 	exit
 else
 	# Example for GNU Bash menu fallback for minimal.
     sudo "$filename" -r menu see_read
 
 fi
+
