@@ -1,19 +1,24 @@
 #!/bin/bash
 
-# Sudo Users Home
-USER_HOME=$(eval echo ~$SUDO_USER)
-
 clear
+# Sudo Users Home
+
+if [ "$(id -u)" = "0" ]; then
+    # This block is executed if the script is run with sudo
+    # echo "Running with root privileges."
+    USER_HOME=$(eval echo ~$SUDO_USER)
+else
+    # This block is executed if the script is not run with sudo
+    echo "Running without root privileges."
+	exit 0
+    # Load libraries or
+fi
+
 debug="0"
 directory="$(dirname "${BASH_SOURCE[0]}")"
 cd "$directory" || exit
 filename="$(basename "${BASH_SOURCE[0]}")" ;
 libpath="$directory/../lib"
-
-if [[ ! -d "$libpath" ]]; then
-    echo "Libraries not found"
-    exit 0
-fi
 
 for file in "$libpath"/configng/*/*.sh; do
     source "$file"
@@ -36,7 +41,7 @@ for category in "${categories[@]}"; do
         while IFS= read -r line; do
             if [[ $line =~ ^#\ @description\ (.*)$ ]]; then
                 description="${BASH_REMATCH[1]}"
-            elif [[ $line =~ ^function\ (.*)\(\)\{$ ]]; then
+            elif [[ $line =~ ^function\ (.*::.*)\(\)\{$ ]]; then
                 function_name="${BASH_REMATCH[1]}"
                 key="$category_name:${file##*/}:${function_name}"
                 functions["$key,function_name"]=$(echo "$function_name" | sed 's/.*:://')
@@ -97,11 +102,12 @@ see_list() {
 
                 # If the group name has not been printed yet, print it and add it to the array
                 if [[ -z ${printed_groups["$group_name"]} ]]; then
-                    echo "    $group_name, [action]"
+                    echo "        $group_name,    [action]"
                     printed_groups["$group_name"]=1
                 fi
 
-                echo "            ${functions["$key,function_name"]} - ${functions["$key,description"]}"
+                echo "                ${functions["$key,function_name"]} - ${functions["$key,description"]}"
+				echo
             done
         done
 		echo
@@ -111,11 +117,11 @@ see_list() {
 
 see_help(){
 
-    echo -e "Usage: ${filename%.*} [options] [action]"
-    echo -e "  Options:"
+    echo -e "Usage: ${filename%.*} [flag] [option] [action]"
+    echo -e "  flags:"
     echo -e "    -h,    Print this help."
     echo
-    echo -e "    -r,    Run a function group."
+    echo -e "    -r,  [option],  [action]  Run a feature."
 
 }
 
@@ -136,6 +142,94 @@ parse_action() {
     fi
 }
 
+see_tui() {
+    local options=()
+    for category in "${categories[@]}"; do
+        local category_name="${category##*/}"
+        local category_description=""
+        local category_file="$category/category"
+
+        if [[ -f "$category_file" ]]; then
+            category_description=$(grep -oP "(?<=# @description ).*" "$category_file")
+        fi
+
+        options+=("$category_name" "$category_description")
+    done
+
+    local choice
+    local dialogue
+
+    if command -v whiptail &> /dev/null; then
+        dialogue="whiptail"
+    elif command -v dialog &> /dev/null; then
+        dialogue="dialog"
+    else
+        echo "TUI not found"
+        return
+    fi
+
+    choice=$($dialogue --menu "Select a category:" 15 60 4 "${options[@]}" 3>&1 1>&2 2>&3)
+
+    if [[ -n $choice ]]; then
+        see_sub_tui "$choice"
+    fi
+}
+
+
+see_sub_tui() {
+    echo "$1"
+
+}
+
+see_read() {
+    echo
+    echo "Please select an action:"
+    echo
+    # Initialize an empty array to store the function keys
+    declare -a function_keys
+
+    # Loop through each key in the functions array
+    local i=1
+    local current_category=""
+    for key in "${!functions[@]}"; do
+        if [[ $key == *",function_name" ]]; then
+            # Add the key to the function_keys array
+            function_keys[i]="${key%,function_name}"
+
+            # Check if the category has changed and display it if so
+            local category="${functions["${function_keys[i]},category"]}"
+            if [[ "$category" != "$current_category" ]]; then
+                echo "Category: $category"
+                current_category="$category"
+            fi
+
+            # Display the function and its description as an option in the menu
+            echo "  $i. ${functions["${function_keys[i]},group_name"]} ${functions[$key]}  - ${functions["${function_keys[i]},description"]}"
+            ((i++))
+        fi
+    done
+
+    echo
+    echo "$i. Show help"
+    ((i++))
+    echo "$i. Exit"
+
+    read -p "Enter your choice: " choice
+
+    if ((choice == i-1)); then
+        see_help
+        see_list
+    elif ((choice == i)); then
+        exit 0
+    elif ((choice >= 1 && choice <= ${#function_keys[@]})); then
+        # Call the selected function using variable indirection
+        eval "${functions["${function_keys[choice]},group_name"]}::${functions["${function_keys[choice]},function_name"]}"
+    else
+        echo "Invalid choice"
+    fi
+}
+
+
 
 if [ "$1" == "-r" ]; then
     shift  # Shifts the arguments to the left, excluding the first argument ("-r")
@@ -152,12 +246,14 @@ elif [ "$1" == "-h" ]; then
     see_help
     see_list
 elif [ "$1" == "-d" ] || [ $debug == "1" ] ; then
-        dialog --title "Config Options" --msgbox "$( see_help; see_list )" 0 0 ; clear ;
-		see_debug
-	exit
-else
-	# Example for GNU Bash menu fallback for minimal.
-    sudo "$filename" -r menu see_read
 
+	see_debug
+	exit
+elif [ "$1" == "-t" ] || [ $debug == "1" ] ; then
+		see_tui
+		exit
+else
+ 	see_read
+	exit
 fi
 
