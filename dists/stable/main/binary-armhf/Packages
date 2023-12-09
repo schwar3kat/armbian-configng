@@ -1,14 +1,14 @@
 Package: configng
-Version: 20231206-2042
+Version: 20231209-1447
 Architecture: all
 Maintainer: Igor Pecovnik <igor@armbian.com>
 Depends: bash
 Priority: optional
 Section: default
-Filename: pool/main/c/configng/configng_20231206-2042_all.deb
-Size: 93006
-SHA256: 1f347bf05934b643e8491f11220dc851ea4d2acc55f71f42c7fc2a93b88732ac
-SHA1: 199688c92e6b970d130d7174f371d1d840d0f3cf
-MD5sum: e06913cbb4021a4919a3f6abc4b1a475
+Filename: pool/main/c/configng/configng_20231209-1447_all.deb
+Size: 93090
+SHA256: ea43ef429ca355b8e0881dfb2163ac494a3715458df81734ffdb1783bfa0499a
+SHA1: 5ff338b1786787e650983618f72026a9e9d818f9
+MD5sum: b2d07040bd4206fda0429dff2992aae0
 Description: Configng
 
