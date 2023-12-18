@@ -1,7 +1,67 @@
 
+#
+# Consept Distribution Compatibility checks
+check_distro() {
+
+    [[ -f "/usr/bin/${filename%%-*}-config" ]] && distro_config="${filename%%-*}"
+    [[ -f "/etc/${filename%%-*}-release" ]] && distro_release="${filename%%-*}"
+    # if both true then we are good to go
+    [[ -z "$distro_config" ]] || [[ -z "$distro_release" ]] && echo "W: Costum build, Tech support links are missing."
+    [[ -n "$distro_config" ]] && [[ -n "$distro_release" ]] && echo "I: This build seems to be community supported" | ./armbian-interface -o
+    [[ -f "/usr/sbin/${filename%%-*}-config" ]] && distro_config="${filename%%-*}"
+    [[ -f "/etc/${filename%%-*}-release" ]] && distro_release="${filename%%-*}"
+
+}
 
 # This function is used to generate a text-based user interface (TUI) for navigating the menus.
 generate_tui() {
+    local options=()
+    local i=0
+    declare -A categories_array
+    for category in "${categories[@]}"; do
+        local category_name="${category##*/}"
+        local category_description=""
+        local category_file="$category/readme.md"
+
+        if [[ -f "$category_file" ]]; then
+            category_description=$(grep -oP "(?<=# @description ).*" "$category_file")
+        fi
+
+        categories_array["$i"]="$category_name"
+        description_array["$i"]="$category_description"
+        options+=("$i" "$(printf '%-7s - %-8s' "${categories_array[$i]}" "${description_array[$i]}")")
+        ((++i))
+    done
+
+    # Check if armbian-config is installed before adding the Legacy option
+    if which armbian-config > /dev/null; then
+        options+=("$i" "$(printf '%-7s - %-8s' "Legacy" "Run Legacy configuration")") 
+        ((++i))
+    fi
+
+    options+=("$i" "$(printf '%-7s - %-8s' "Help" "Documentation, support, sources")") 
+    ((++i))
+
+    local choice
+    choice=$($dialogue --menu "Select a category:" 0 0 9 "${options[@]}" 3>&1 1>&2 2>&3)
+    
+    if [[ -n $choice ]]; then
+        if ((choice == "$i - 1")); then
+            generate_help | armbian-interface -o
+            exit ;
+        elif ((choice == "$i - 2")); then
+            # Check again before running armbian-config
+            if which armbian-config > /dev/null; then
+                armbian-config
+                exit ;
+            fi
+        else
+            generate_sub_tui "${categories_array[$choice]}"
+        fi
+    fi
+}
+
+generate_tuiold() {
     local options=()
     local i=0
     declare -A categories_array
