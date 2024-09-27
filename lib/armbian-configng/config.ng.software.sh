@@ -78,7 +78,7 @@ module_options+=(
 )
 #
 # Install Docker from repo using apt
-# Setup sources list and GPG key then install the app. If you want a full desktop then $1=desktop
+# Setup sources list and GPG key then install the app. If you want a full engine then $1=engine
 #
 install_docker() {
 	# Check if repo for distribution exists.
